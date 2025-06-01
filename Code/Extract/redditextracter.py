@@ -1,50 +1,41 @@
 import praw
-import pandas as pd
-from datetime import datetime
-from psaw import PushshiftAPI
+import json
+import os
+from datetime import datetime, timezone
 
+def fetch_recent_reddit_posts(output_dir,limit_per_sub):
+    reddit = praw.Reddit(
+        client_id="4iDE06oRtkTPDv46eVRjyA",
+        client_secret="ggeSKBmo5SNJrxIUySTr1lw_9qO09Q",
+        user_agent="AmithETFExtractor"
+    )
 
-reddit = praw.Reddit(
-    client_id="4iDE06oRtkTPDv46eVRjyA",
-    client_secret="ggeSKBmo5SNJrxIUySTr1lw_9qO09Q",
-    user_agent="AmithETFExtractor"
-)
-api = PushshiftAPI(reddit)
+    subreddits = ["IndianStockMarket", "mutualfunds", "personalfinance", "investing"]
+    all_data = []
 
-# Test 1: Print your Reddit username (will work if you're authenticated)
-try:
-    print("Logged in as:", reddit.user.me())
-except Exception as e:
-    print("Error during login:", e)
+    for sub in subreddits:
+        print(f"Fetching {limit_per_sub} posts from r/{sub}...")
+        for submission in reddit.subreddit(sub).new(limit=limit_per_sub):
+            if "etf" in submission.title.lower():  # Case-insensitive filter
+                created_date = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc).strftime('%Y-%m-%d')
+                all_data.append({
+                "subreddit": submission.subreddit.display_name,
+                "title": submission.title,
+                "author": str(submission.author),
+                "score": submission.score,
+                "created_date": created_date,
+                 })
 
-# Your list of subreddits
-subreddits = ["IndianStockMarket", "mutualfunds", "personalfinance", "investing"]
+    os.makedirs(output_dir, exist_ok=True)
+    now = datetime.now().strftime("%Y%m%d")
+    output_path = os.path.join(output_dir, f"reddit_posts_etf_{now}.json")
 
-# Date range
-start_date = int(datetime(2024, 9, 1).timestamp())
-end_date = int(datetime(2025, 4, 30).timestamp())
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
 
-# Output data
-all_data = []
+    print(f"Saved {len(all_data)} posts to {output_path}")
 
-for sub in subreddits:
-    print(f"Fetching posts from r/{sub}...")
-    submissions = api.search_submissions(after=start_date,
-                                         before=end_date,
-                                         subreddit=sub,
-                                         filter=['title', 'score', 'author', 'created_utc', 'subreddit'],
-                                         limit=100)
-
-    for post in submissions:
-        all_data.append({
-            "Subreddit": post.subreddit,
-            "Title": post.title,
-            "Author": str(post.author),
-            "Score": post.score,
-            "Created Date": datetime.utcfromtimestamp(post.created_utc).strftime('%Y-%m-%d'),
-        })
-
-# Save to CSV
-df = pd.DataFrame(all_data)
-df.to_csv("reddit_posts_etf_sept2024_apr2025.csv", index=False)
-print("Data saved to reddit_posts_etf_sept2024_apr2025.csv")
+if __name__ == "__main__":
+    output_dir='Data/Raw/'
+    limit_per_sub=100
+    fetch_recent_reddit_posts(output_dir,limit_per_sub)
