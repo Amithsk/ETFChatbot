@@ -28,43 +28,78 @@ def create_engine():
 
 def load_data():
     engine = create_engine()
+#Retrieve the ETF and Asset category details from the DB
     query = """
-        SELECT * 
-        FROM etf 
-        JOIN etf_returns USING(etf_id)
+        SELECT e.*, r.*, a.asset_info
+        FROM etf e
+        JOIN etf_returns r ON e.etf_id = r.etf_id
+        LEFT JOIN etf_asset a ON e.etf_asset_category = a.idetf_asset
     """
     return pd.read_sql(query, engine)
 
 def generate_prompt_response_pairs(df):
     pairs = []
+
+    df = df.loc[:, ~df.columns.duplicated()]
+    print(df.columns.tolist())
+    df['category'] = df['asset_info'].fillna(df['etf_asset_category'])
+
     pivot_df = df.pivot_table(
-        index=['etf_id', 'etf_name', 'etf_asset_category'],
+        index=['etf_id', 'etf_name', 'category'],
         columns='etf_returns_timeperiod',
         values='etf_returnsvalue',
         aggfunc='first'
     ).reset_index()
+    print("Pivoted columns:", pivot_df.columns.tolist())
+
+    print(df['etf_returns_timeperiod'].unique())
 
     for _, row in pivot_df.iterrows():
         name = row['etf_name']
-        r1, r3, rs = row.get('1Y'), row.get('3Y'), row.get('Since Inception')
-        if pd.notna(r1):
-            pairs.append({"prompt": f"What is the 1Y return of {name}?", "response": f"The 1-year return of {name} is {r1:.2f}%."})
-        if pd.notna(r3):
-            pairs.append({"prompt": f"What is the 3Y return of {name}?", "response": f"The 3-year return of {name} is {r3:.2f}%."})
-        if pd.notna(rs):
-            pairs.append({"prompt": f"What is the return of {name} since launch?", "response": f"The return of {name} since launch is {rs:.2f}%."})
+        category = row['category']
+        for period, label in [('1Y', '1-year'), ('3Y', '3-year'), ('5Y', '5-year'), ('10Y', '10-year'), ('SL', 'since launch')]:
+            value = row.get(period)
+            if pd.notna(value):
+                pairs.append({
+                    "prompt": f"What is the {label} return of {name}?",
+                    "response": f"The {label} return of {name} is {value:.2f}%."
+                })
 
-    if '1Y' in pivot_df.columns:
-        max_row = pivot_df.loc[pivot_df['1Y'].idxmax()]
-        min_row = pivot_df.loc[pivot_df['1Y'].idxmin()]
-        pairs.append({"prompt": "Which ETF has the highest 1Y return?", "response": f"The ETF with the highest 1-year return is {max_row['etf_name']} with {max_row['1Y']:.2f}%."})
-        pairs.append({"prompt": "Which ETF has the lowest 1Y return?", "response": f"The ETF with the lowest 1-year return is {min_row['etf_name']} with {min_row['1Y']:.2f}%."})
+    # Average return by category and highest-returning category
+    for period, label in [('1Y', '1 year'), ('3Y', '3 years'), ('5Y', '5 years'), ('10Y', '10 years')]:
+        if period in pivot_df.columns:
+            category_avg = pivot_df.groupby('category')[period].mean().reset_index()
+            for _, row in category_avg.iterrows():
+                pairs.append({
+                    "prompt": f"What is the average {period} return of {row['category']} ETFs?",
+                    "response": f"The average {label} return of ETFs in the {row['category']} category is {row[period]:.2f}%."
+                })
 
-        category_avg = pivot_df.groupby('etf_asset_category')['1Y'].mean().reset_index()
-        for _, row in category_avg.iterrows():
-            pairs.append({"prompt": f"What is the average 1Y return of {row['etf_asset_category']} ETFs?", "response": f"The average 1-year return of ETFs in the {row['etf_asset_category']} category is {row['1Y']:.2f}%."})
+            top_cat = category_avg.loc[category_avg[period].idxmax()]
+            pairs.append({
+                "prompt": f"Which category has the highest return in the last {label}?",
+                "response": f"The category with the highest average return in the last {label} is {top_cat['category']} with {top_cat[period]:.2f}%."
+            })
+
+    # Highest return since launch within each category
+    if 'SL' in pivot_df.columns:
+        for category, group in pivot_df.groupby('category'):
+            group = group.dropna(subset=['SL'])
+            if not group.empty:
+                max_row = group.loc[group['SL'].idxmax()]
+                pairs.append({
+                    "prompt": f"Which ETF has the highest return in the {category} category since launch?",
+                    "response": f"The ETF with the highest return in the {category} category since launch is {max_row['etf_name']} with {max_row['SL']:.2f}%."
+                })
+
+        # Overall highest and lowest
+        max_row = pivot_df.loc[pivot_df['SL'].idxmax()]
+        min_row = pivot_df.loc[pivot_df['SL'].idxmin()]
+        pairs.append({"prompt": "Which ETF has the highest return since inception ?", "response": f"The ETF with the highest return since inception is {max_row['etf_name']} with {max_row['SL']:.2f}%."})
+        pairs.append({"prompt": "Which ETF has the lowest return since inception?", "response": f"The ETF with the lowest return since inception is {min_row['etf_name']} with {min_row['SL']:.2f}%."})
 
     return pairs
+
 
 def format_for_causal_lm(example):
     return {"text": f"<s>[Prompt] {example['prompt']} [/Prompt] [Answer] {example['response']} [/Answer]</s>"}
@@ -90,7 +125,7 @@ if __name__ == "__main__":
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     training_args = TrainingArguments(
-        output_dir="Code/Training/etf_tinyllama_finetuned",
+        output_dir="Models/Training/etf_tinyllama_finetuned/",
         per_device_train_batch_size=2,
         num_train_epochs=3,
         save_steps=100,
@@ -112,6 +147,6 @@ if __name__ == "__main__":
     trainer.train()
     print("Number of training samples:", len(tokenized))
 
-    model.save_pretrained("Code/Training/etf_tinyllama_finetuned")
-    tokenizer.save_pretrained("Code/Training/etf_tinyllama_finetuned")
-    
+    model.save_pretrained("Models/Training/etf_tinyllama_finetuned/")
+    tokenizer.save_pretrained("Models/Training/etf_tinyllama_finetuned/")
+
