@@ -193,7 +193,10 @@ if __name__ == "__main__":
     pairs = generate_prompt_response_etfreturn_pairs(df)
     #print("The pair response",pairs)
     
-    dataset = Dataset.from_list(pairs)
+    unique_pairs = [dict(t) for t in {tuple(d.items()) for d in pairs}]
+    print(f"Original: {len(pairs)} | Unique: {len(unique_pairs)}")
+
+    dataset = Dataset.from_list(unique_pairs)
     dataset = dataset.map(format_for_causal_lm)
 
     model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
