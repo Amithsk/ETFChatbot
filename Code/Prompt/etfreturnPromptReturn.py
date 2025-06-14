@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from datasets import Dataset
 import datetime
 import random
+import torch
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -200,6 +201,7 @@ if __name__ == "__main__":
     print(f"Generated pairs: {len(pairs)}")
     responses = [p['response'] for p in pairs]
     print(f"Unique responses: {len(set(responses))}")
+    
 
     dataset = Dataset.from_list(pairs)
     dataset = dataset.map(format_for_causal_lm)
@@ -209,6 +211,8 @@ if __name__ == "__main__":
     tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(model_id)
+    if torch.cuda.is_available():
+        model = model.to("cuda")
 
     tokenized = dataset.map(
         lambda x: tokenizer(x["text"], truncation=True, padding="max_length", max_length=512),
@@ -225,7 +229,7 @@ if __name__ == "__main__":
         save_total_limit=2,
         logging_dir="./logs",
         logging_steps=10,
-        fp16=False,  # Not supported on CPU
+        fp16=True,  # only works with NVIDIA GPU
         report_to="none"
     )
 
