@@ -170,22 +170,26 @@ def generate_prompt_response_etfreturn_pairs(df):
     # --- Since Launch Returns ---
     if 'SL' in df['etf_returns_timeperiod'].unique():
         sl_df = df[df['etf_returns_timeperiod'] == 'SL'].dropna(subset=['etf_returnsvalue'])
-        for _, row in sl_df.iterrows():
-            response = f"The return of {row['etf_name']} since launch is {row['etf_returnsvalue']:.2f}%."
-            prompt = conversational_variants("What is the return of {} since launch?", row['etf_name'])[0]
-            add_pair(prompt, response)
+        sl_df = sl_df.drop_duplicates(subset=['etf_name', 'etf_returnsvalue'])  # Deduplicate
 
-        if not sl_df.empty:
-            max_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmax()]
-            min_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmin()]
-            add_pair(
-                "Which ETF has the highest return since inception?",
-                f"The ETF with the highest return since inception is {max_row['etf_name']} with {max_row['etf_returnsvalue']:.2f}%."
-            )
-            add_pair(
-                "Which ETF has the lowest return since inception?",
-                f"The ETF with the lowest return since inception is {min_row['etf_name']} with {min_row['etf_returnsvalue']:.2f}%."
-            )
+    for _, row in sl_df.iterrows():
+        value = round(row['etf_returnsvalue'], 2)
+        response = f"The return of {row['etf_name']} since launch is {value:.2f}%."
+        prompt = conversational_variants("What is the return of {} since launch?", row['etf_name'])[0]
+        add_pair(prompt, response)
+
+    if not sl_df.empty:
+        max_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmax()]
+        min_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmin()]
+        add_pair(
+            "Which ETF has the highest return since inception?",
+            f"The ETF with the highest return since inception is {max_row['etf_name']} with {max_row['etf_returnsvalue']:.2f}%."
+        )
+        add_pair(
+            "Which ETF has the lowest return since inception?",
+            f"The ETF with the lowest return since inception is {min_row['etf_name']} with {min_row['etf_returnsvalue']:.2f}%."
+        )
+
 
     return pairs
 
