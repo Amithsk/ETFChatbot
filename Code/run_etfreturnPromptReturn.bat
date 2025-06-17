@@ -1,5 +1,5 @@
 @echo off
-set VENV_PATH=E:\ETFChatbot\etfvenv
+set VENV_PATH=E:\ETFChatbot\etfchatbotenv
 set SCRIPT_PATH=E:\ETFChatbot\Code\Prompt\etfreturnPromptReturn.py
 set LOG_PATH=E:\ETFChatbot\logs\etfreturnPromptReturn.log
 
