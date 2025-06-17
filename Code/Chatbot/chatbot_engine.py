@@ -1,24 +1,35 @@
+import os
 import yaml
 from llama_cpp import Llama
+from pathlib import Path
 
 class ETFChatbot:
-    def __init__(self, config_path="config.yaml"):
+    def __init__(self, config_filename="config.yaml"):
+        base_dir = Path(__file__).parent.resolve()
+        config_path = base_dir / config_filename
+
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
+
+        # Convert model_path to absolute if it's not already
+        model_path = Path(self.config["model_path"])
+        if not model_path.is_absolute():
+            model_path = (base_dir / model_path).resolve()
+
         self.llm = Llama(
-            model_path=self.config["model_path"],
-            n_ctx=2048,
+            model_path=str(model_path),
+            n_ctx=self.config.get("n_ctx", 2048),
             n_threads=4,
-            n_gpu_layers=20  # adjust based on your GPU
+            n_gpu_layers=self.config.get("n_gpu_layers", 0)
         )
 
     def ask(self, prompt: str) -> str:
         try:
             response = self.llm(
                 prompt,
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                top_p=self.config["top_p"],
+                max_tokens=self.config.get("max_tokens", 256),
+                temperature=self.config.get("temperature", 0.7),
+                top_p=self.config.get("top_p", 0.95),
             )
             return response["choices"][0]["text"].strip()
         except Exception as e:
