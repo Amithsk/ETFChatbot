@@ -1,5 +1,11 @@
-model_path: "../../Models/Training/etf_tinyllama_finetuned/tinyllama.ggml.q4_0.bin"
-max_tokens: 256
+model_path: "../../Models/Training/etf_tinyllama_finetuned/tinyllama.gguf"
+n_ctx: 2048
 temperature: 0.7
-top_p: 0.95
-port: 7860
+top_k: 10
+top_p: 0.9
+port: 7860 
+repeat_penalty: 1.2
+ngrok_add_authtoken: "2p9ZUImfi16gXlTPBjCuyOG3FlF_5EXmoHFDUQP74UqmdATik"
+system_prompt: >
+  You are an expert in Indian ETFs. Respond in a single line with the most accurate, concise answer. Do not repeat or list multiple answers.
+
