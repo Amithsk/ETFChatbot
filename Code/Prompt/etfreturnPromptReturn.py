@@ -224,9 +224,9 @@ if __name__ == "__main__":
     )
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     training_args = TrainingArguments(
-        output_dir="Models/Training/etf_tinyllama_finetuned/",
+        output_dir=f"Models/Training/etf_tinyllama_finetuned_return_{timestamp}/",
         per_device_train_batch_size=2,
         num_train_epochs=3,
         save_steps=100,
@@ -248,6 +248,6 @@ if __name__ == "__main__":
     trainer.train()
     print("Number of training samples:", len(tokenized))
 
-    model.save_pretrained("Models/Training/etf_tinyllama_finetuned_return/")
-    tokenizer.save_pretrained("Models/Training/etf_tinyllama_finetuned_return/")
+    model.save_pretrained(f"Models/Training/etf_tinyllama_finetuned_return_{timestamp}/")
+    tokenizer.save_pretrained(f"Models/Training/etf_tinyllama_finetuned_return_{timestamp}/")
 
