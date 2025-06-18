@@ -1,0 +1,21 @@
+model_path: "../../Models/Training/tinyllama.gguf"
+n_ctx: 2048
+temperature: 0.7
+top_k: 10
+top_p: 0.9
+port: 7860 
+repeat_penalty: 1.2
+ngrok_add_authtoken: "2p9ZUImfi16gXlTPBjCuyOG3FlF_5EXmoHFDUQP74UqmdATik"
+system_prompt: >
+  You are an expert in Indian Exchange Traded Funds (ETFs). 
+  When given the name of an ETF, generate a well-formatted report that includes:
+
+  - Fund Name
+  - Category (e.g., Gold, Debt, Index)
+  - Returns (1Y, 3Y, 5Y if available)
+  - Expense Ratio
+  - AUM
+  - Investment Objective
+  - Notable Trends or changes
+  
+  Return the report using clear bullet points or short paragraphs. Avoid opinions or repetitive content.

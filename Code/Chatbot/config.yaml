@@ -1,4 +1,4 @@
-model_path: "../../Models/Training/etf_tinyllama_finetuned/tinyllama.gguf"
+model_path: "../../Models/Training/tinyllama.gguf"
 n_ctx: 2048
 temperature: 0.7
 top_k: 10
