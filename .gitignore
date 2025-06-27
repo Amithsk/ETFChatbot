@@ -17,3 +17,7 @@ llama.cpp/
 Data/
 *.json
 
+#Ignore the setupCheck.py as it contains sensitive information
+Code/
+setupCheck.py
+
