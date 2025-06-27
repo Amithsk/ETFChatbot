@@ -1,5 +1,6 @@
 import yaml
 import torch
+import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 class ETFChatbot:
@@ -7,9 +8,13 @@ class ETFChatbot:
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
-        model_path = self.config["model_path"]
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path)
+        model_path = os.path.abspath(self.config["model_path"])
+
+        if not os.path.isdir(model_path):
+            raise ValueError(f"[ERROR] Model path does not exist: {model_path}")
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True)
 
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
@@ -24,13 +29,11 @@ class ETFChatbot:
 
         self.system_prompt = self.config.get("system_prompt", "You are a helpful assistant.")
 
-    def ask(self, user_input):
-        prompt = f"<s>[Prompt] {user_input} [/Prompt] [Answer]"
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(self.model.device)
-
-        output = self.model.generate(input_ids, **self.generation_kwargs)
-        decoded = self.tokenizer.decode(output[0], skip_special_tokens=True)
-
-        if "[/Answer]" in decoded:
-            return decoded.split("[/Answer]")[-1].strip()
-        return decoded.strip()
+    def ask(self, message):
+        prompt = f"<s>[Prompt] {message} [/Prompt] [Answer]"
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model.generate(**inputs, **self.generation_kwargs)
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Trim until answer 
+        return response.split("[Answer]")[-1].strip().replace("</s>", "")
