@@ -1,0 +1,14 @@
+# Ignore virtual environment
+etfchatbotenv/
+
+
+# Ignore training outputs
+Models/Training
+
+#Ignore the logs
+logs/
+*.log
+
+
+#Ignore the llama.cpp
+llama.cpp/
