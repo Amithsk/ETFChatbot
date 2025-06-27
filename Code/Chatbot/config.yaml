@@ -1,4 +1,7 @@
-model_path: "Models/Training/etf_tinyllama_finetuned_return_20250627_1211"
+base_model: "Models/Training/Mistral-LoRA-20250628_0058"
+tokenizer_path: "Models/Training/Mistral-LoRA-20250628_0058"
+lora_model: "Models/Training/Mistral-LoRA-20250628_0058"
+
 n_ctx: 512
 temperature: 0.7
 top_k: 10

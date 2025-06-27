@@ -1,20 +1,39 @@
 import yaml
 import torch
 import os
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 class ETFChatbot:
     def __init__(self, config_path):
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
-        model_path = os.path.abspath(self.config["model_path"])
+        base_model_path = os.path.abspath(self.config["base_model"])
+        lora_model_path = os.path.abspath(self.config["lora_model"])
 
-        if not os.path.isdir(model_path):
-            raise ValueError(f"[ERROR] Model path does not exist: {model_path}")
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True)
+        if not os.path.isdir(base_model_path):
+            raise ValueError(f"[ERROR] Base model path does not exist: {base_model_path}")
+
+        if not os.path.isdir(lora_model_path):
+            raise ValueError(f"[ERROR] LoRA model path does not exist: {lora_model_path}")
+
+        print("[INFO] Loading tokenizer...")
+        self.tokenizer = AutoTokenizer.from_pretrained(base_model_path, local_files_only=True)
+
+        print("[INFO] Loading base model in 4-bit mode...")
+        quant_config = BitsAndBytesConfig(load_in_4bit=True)
+        base_model = AutoModelForCausalLM.from_pretrained(
+            base_model_path,
+            quantization_config=quant_config,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            local_files_only=True
+        )
+
+        print("[INFO] Applying LoRA adapters...")
+        self.model = PeftModel.from_pretrained(base_model, lora_model_path, torch_dtype=torch.float16)
+        self.model.eval()
 
         if torch.cuda.is_available():
             self.model = self.model.to("cuda")
@@ -35,5 +54,4 @@ class ETFChatbot:
         with torch.no_grad():
             outputs = self.model.generate(**inputs, **self.generation_kwargs)
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Trim until answer 
         return response.split("[Answer]")[-1].strip().replace("</s>", "")
