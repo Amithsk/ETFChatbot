@@ -1,25 +1,15 @@
 import gradio as gr
-from pyngrok import ngrok
 from chatbot_engine import ETFChatbot
 
-# Load chatbot model
-bot = ETFChatbot()
+chatbot = ETFChatbot("Chatbot/config.yaml")
 
-# Start Ngrok tunnel
-public_url = ngrok.connect(bot.config["port"])
-print(f"🔗 Shareable chatbot link: {public_url}")
+def respond(message, history):
+    answer = chatbot.ask(message)
+    return answer
 
-# Define Gradio interface
-def chat_interface(user_input):
-    return bot.ask(user_input)
+with gr.Blocks() as demo:
+    gr.Markdown("## Indian ETF Chatbot")
+    chat = gr.ChatInterface(fn=respond)
 
-iface = gr.Interface(
-    fn=chat_interface,
-    inputs=gr.Textbox(lines=3, placeholder="Ask a question about ETFs..."),
-    outputs="text",
-    title="ETF Chatbot (TinyLLaMA)",
-    description="Ask me about ETF returns, tracking error, AUM, and more.",
-)
-
-# Launch
-iface.launch(server_port=bot.config["port"], share=False)
+if __name__ == "__main__":
+    demo.launch(share=True)
