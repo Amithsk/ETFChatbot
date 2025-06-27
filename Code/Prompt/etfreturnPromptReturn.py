@@ -42,6 +42,10 @@ def load_data():
     """
     df = pd.read_sql(query, engine)
     print(f"[INFO] Retrieved {len(df)} rows from the database.")
+    #csv_file_path = f"Models/Training/etf_data_export.csv"
+    #df.to_csv(csv_file_path, index=False)
+    #print(f"[INFO] Data written to {csv_file_path}")
+
     
     return pd.read_sql(query, engine)
 
@@ -62,14 +66,15 @@ def conversational_variants(template, *args):
 
 def generate_prompt_response_etfreturn_pairs(df):
     pairs = []
-    seen_prompts = set()  # Track prompt uniqueness
-    seen_facts = set()    # Avoid repeated factual responses
+    seen_prompts = set()
+    seen_facts = set()
     df = df.loc[:, ~df.columns.duplicated()]
-    df['category'] = df['asset_info'].fillna(df['etf_asset_category'])
+    df['category'] = df['asset_info'].where(df['asset_info'].notna() & (df['asset_info'] != df['etf_name']), df['etf_asset_category'])
     current_year = datetime.datetime.now().year
 
     df_filtered = df.dropna(subset=['etf_returnsvalue', 'etf_returnsyear', 'etf_name']).copy()
     df_filtered['etf_returnsyear'] = pd.to_numeric(df_filtered['etf_returnsyear'], errors='coerce')
+   
 
     annual_returns = (
         df_filtered.groupby(['etf_name', 'etf_returnsyear'])['etf_returnsvalue']
@@ -94,6 +99,7 @@ def generate_prompt_response_etfreturn_pairs(df):
                 add_pair(prompt, response)
 
     # --- Category Average Return by Year ---
+    
     for year in df['etf_returnsyear'].dropna().unique():
         grouped = df[df['etf_returnsyear'] == year].groupby('category')['etf_returnsvalue'].mean().reset_index()
         for _, row in grouped.iterrows():
@@ -111,7 +117,7 @@ def generate_prompt_response_etfreturn_pairs(df):
             for cat in grouped.index:
                 values = grouped.loc[cat].dropna()
                 if len(values) == n:
-                    compounded = (values.add(1).prod() - 1) * 100
+                    compounded =round(((values/ 100 + 1).prod() - 1) * 100,2)
                     grouped.loc[cat, 'compounded'] = compounded
             if 'compounded' in grouped.columns:
                 top_cat = grouped['compounded'].idxmax()
@@ -126,7 +132,7 @@ def generate_prompt_response_etfreturn_pairs(df):
         for etf in annual_returns.index:
             returns = annual_returns.loc[etf, [y for y in range(start_year, current_year) if y in annual_returns.columns]].dropna()
             if len(returns) == n:
-                compounded = (returns.add(1).prod() - 1) * 100
+                compounded = round(((returns / 100 + 1).prod() - 1) * 100,2)
                 response = f"The return of {etf} in the last {n} years was {compounded:.2f}%."
                 prompt = conversational_variants("What was the return of {} in the last {} years?", etf, n)[0]
                 add_pair(prompt, response)
@@ -140,64 +146,72 @@ def generate_prompt_response_etfreturn_pairs(df):
                 end = years[j]
                 returns = annual_returns.loc[etf, [y for y in range(start, end + 1)]].dropna()
                 if len(returns) == (end - start + 1):
-                    compounded = (returns.add(1).prod() - 1) * 100
+                    compounded = round(((returns / 100 + 1).prod() - 1) * 100,2)
                     response = f"The return of {etf} from {start} to {end} was {compounded:.2f}%."
                     prompt = conversational_variants("What was the return of {} from {} to {}?", etf, start, end)[0]
                     add_pair(prompt, response)
 
-    # --- Best & Worst ETF in Last N Years ---
-    for n in [2, 3, 5]:
-        start_year = current_year - n
-        results = []
-        for etf in annual_returns.index:
-            returns = annual_returns.loc[etf, [y for y in range(start_year, current_year) if y in annual_returns.columns]].dropna()
-            if len(returns) == n:
-                compounded = (returns.add(1).prod() - 1) * 100
-                results.append((etf, compounded))
+    # --- Computed Since Launch Returns ---
+    computed_sl_returns = []
 
-        if results:
-            results.sort(key=lambda x: x[1], reverse=True)
-            top, bottom = results[0], results[-1]
-            add_pair(
-                f"Which ETF had the highest return in the last {n} years?",
-                f"{top[0]} had the highest return in the last {n} years with {top[1]:.2f}%."
-            )
-            add_pair(
-                f"Which ETF had the lowest return in the last {n} years?",
-                f"{bottom[0]} had the lowest return in the last {n} years with {bottom[1]:.2f}%."
-            )
+    for etf in annual_returns.index:
+        returns = annual_returns.loc[etf].dropna()
+        if len(returns) >= 2:
+            start_year = returns.index.min()
+            end_year = returns.index.max()
+            year_range = list(range(start_year, end_year + 1))
+            valid_returns = annual_returns.loc[etf, year_range].dropna()
+            if len(valid_returns) == len(year_range):
+                compounded = round(((valid_returns / 100 + 1).prod() - 1) * 100,2)
+                computed_sl_returns.append((etf, compounded, start_year, end_year))
+                response = f"The return of {etf} since launch (from {start_year} to {end_year}) is {compounded:.2f}%."
+                prompt = conversational_variants("What is the return of {} since launch?", etf)[0]
+                add_pair(prompt, response)
 
-    # --- Since Launch Returns ---
-    if 'SL' in df['etf_returns_timeperiod'].unique():
-        sl_df = df[df['etf_returns_timeperiod'] == 'SL'].dropna(subset=['etf_returnsvalue'])
-        sl_df = sl_df.drop_duplicates(subset=['etf_name', 'etf_returnsvalue'])  # Deduplicate
+    # --- Best/Worst ETF Since Launch ---
+    if computed_sl_returns:
+        top = max(computed_sl_returns, key=lambda x: x[1])
+        bottom = min(computed_sl_returns, key=lambda x: x[1])
 
-    for _, row in sl_df.iterrows():
-        value = round(row['etf_returnsvalue'], 2)
-        response = f"The return of {row['etf_name']} since launch is {value:.2f}%."
-        prompt = conversational_variants("What is the return of {} since launch?", row['etf_name'])[0]
-        add_pair(prompt, response)
-
-    if not sl_df.empty:
-        max_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmax()]
-        min_row = sl_df.loc[sl_df['etf_returnsvalue'].idxmin()]
         add_pair(
             "Which ETF has the highest return since inception?",
-            f"The ETF with the highest return since inception is {max_row['etf_name']} with {max_row['etf_returnsvalue']:.2f}%."
+            f"The ETF with the highest return since launch is {top[0]} with {top[1]:.2f}% (from {top[2]} to {top[3]})."
         )
         add_pair(
             "Which ETF has the lowest return since inception?",
-            f"The ETF with the lowest return since inception is {min_row['etf_name']} with {min_row['etf_returnsvalue']:.2f}%."
+            f"The ETF with the lowest return since launch is {bottom[0]} with {bottom[1]:.2f}% (from {bottom[2]} to {bottom[3]})."
         )
 
+        
+    # --- Return of ETF as of specific year (i.e. since launch to given year) ---
+    for etf in annual_returns.index:
+        returns = annual_returns.loc[etf].dropna()
+        if len(returns) >= 2:
+            launch_year = returns.index.min()
+            max_year = returns.index.max()
+            for as_of_year in range(launch_year + 1, max_year + 1):
+                year_range = list(range(launch_year, as_of_year + 1))
+                available = annual_returns.loc[etf, year_range].dropna()
+                if len(available) == len(year_range):
+                    compounded = round(((available / 100 + 1).prod() - 1) * 100,2)
+                    response = f"The return of {etf} as of {as_of_year} (from {launch_year} to {as_of_year}) is {compounded:.2f}%."
+                    prompt = conversational_variants("What is the return of {} as of {}?", etf, as_of_year)[0]
+                    add_pair(prompt, response)
 
     return pairs
 
 
 
-
-def format_for_causal_lm(example):
-    return {"text": f"<s>[Prompt] {example['prompt']} [/Prompt] [Answer] {example['response']} [/Answer]</s>"}
+#Pass tokenizer explicitly to the function
+def format_for_causal_lm(example,tokenizer):
+    #This will makes sure the model sees <EOS> as the signal “that’s your entire response.”
+    text  = (
+        f"<s>[Prompt] {example['prompt']} [/Prompt] "
+        f"[Answer] {example['response']} [/Answer] "
+        f"{tokenizer.eos_token}"
+        f"</s>"
+    )
+    return {"text": text}
 
 if __name__ == "__main__":
     df = load_data()
@@ -208,13 +222,20 @@ if __name__ == "__main__":
     
 
     dataset = Dataset.from_list(pairs)
-    dataset = dataset.map(format_for_causal_lm)
+    dataset = dataset.map(lambda x: format_for_causal_lm(x, tokenizer))
 
     model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
+    #To ensure the model stop at the EOS token
+    tokenizer.add_special_tokens({
+    "eos_token": "<EOS>",
+    "additional_special_tokens": ["<EOS>"]
+        })
     tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(model_id)
+    #To resize the model
+    model.resize_token_embeddings(len(tokenizer))
     if torch.cuda.is_available():
         model = model.to("cuda")
 
@@ -228,7 +249,8 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir=f"Models/Training/etf_tinyllama_finetuned_return_{timestamp}/",
         per_device_train_batch_size=2,
-        num_train_epochs=3,
+        num_train_epochs=1,# (optional) disable epoch counting so you don’t trigger warnings:
+        max_steps=100,#To limit the training,post validation comment this one training is done
         save_steps=100,
         save_total_limit=2,
         logging_dir="./logs",
