@@ -222,7 +222,7 @@ if __name__ == "__main__":
     
 
     dataset = Dataset.from_list(pairs)
-    dataset = dataset.map(lambda x: format_for_causal_lm(x, tokenizer))
+    
 
     model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -232,6 +232,8 @@ if __name__ == "__main__":
     "additional_special_tokens": ["<EOS>"]
         })
     tokenizer.pad_token = tokenizer.eos_token
+
+    dataset = dataset.map(lambda x: format_for_causal_lm(x, tokenizer))
 
     model = AutoModelForCausalLM.from_pretrained(model_id)
     #To resize the model
