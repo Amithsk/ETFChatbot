@@ -12,3 +12,8 @@ logs/
 
 #Ignore the llama.cpp
 llama.cpp/
+
+#Ignore the llama.cpp
+Data/
+*.json
+
