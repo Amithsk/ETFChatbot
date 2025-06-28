@@ -13,11 +13,28 @@ logs/
 #Ignore the llama.cpp
 llama.cpp/
 
-#Ignore the llama.cpp
+#Ignore the data folder
 Data/
-*.json
+
 
 #Ignore the setupCheck.py as it contains sensitive information
-Code/
-setupCheck.py
+Code/setupCheck.py
 
+
+#Ignore the Training folder
+Code/Training
+
+#Ignore the .env file
+.env
+
+#To ignore the large file
+*.pt
+*.safetensors
+
+#To ignore the .pem files
+*.pem
+
+#To ignore the pycache
+Code/Chatbot/__pycache__/
+*.pyc
+Code/Reportbot/__pycache__/
