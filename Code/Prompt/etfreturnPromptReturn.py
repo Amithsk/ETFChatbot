@@ -45,72 +45,48 @@ def load_data():
 
 # === Prompt Generator ===
 def generate_prompt_response_pairs(df):
-    today = datetime.date.today()
-    ref_month = today.strftime('%b')       # e.g. "Jun"
-    ref_year_1y = today.year - 1
-    ref_year_3y = today.year - 3
+    # 1. Convert month + year to datetime
+    df = df.copy()
+    df['return_date'] = pd.to_datetime(
+        df['etf_returnsmonth'] + ' ' + df['etf_returnsyear'].astype(str),
+        format='%b %Y',
+        errors='coerce'
+    )
 
-    df_1y = df[
-        (df['etf_returns_timeperiod'] == '1Y') &
-        (df['etf_returnsmonth'] == ref_month) &
-        (df['etf_returnsyear'] == ref_year_1y)
-    ]
+    prompt_variants = {
+        "1Y": [
+            "What is the 1Y return of {name}?",
+            "How much did {name} return last year?",
+        ],
+        "3Y": [
+            "What is the 3Y return of {name}?",
+            "How much has {name} returned in 3 years?",
+        ],
+        "Since Inception": [
+            "What is the return of {name} since launch?",
+            "How much has {name} returned since inception?",
+        ],
+    }
 
-    df_3y = df[
-        (df['etf_returns_timeperiod'] == '3Y') &
-        (df['etf_returnsmonth'] == ref_month) &
-        (df['etf_returnsyear'] == ref_year_3y)
-    ]
+    result = []
 
-    df_si = df[df['etf_returns_timeperiod'] == 'Since Inception']
-    df_si = df_si.sort_values(['etf_id', 'etf_returnsyear', 'etf_returnsmonth'])
-    df_si = df_si.drop_duplicates('etf_id', keep='last')
+    for period in ["1Y", "3Y", "Since Inception"]:
+        period_df = df[df['etf_returns_timeperiod'] == period]
+        latest_df = period_df.sort_values(['etf_id', 'return_date']) \
+                             .drop_duplicates('etf_id', keep='last')
 
-    prompt_variants_1y = [
-        "What is the 1Y return of {name}?",
-        "How much did {name} return last year?",
-        "What was {name}'s return over the past year?",
-        "Tell me the one-year return for {name}?",
-        "Last year return of {name}?"
-    ]
-    prompt_variants_3y = [
-        "What is the 3Y return of {name}?",
-        "How much has {name} returned in 3 years?",
-        "What was the 3-year return for {name}?",
-        "Return of {name} over the past 3 years?"
-    ]
-    prompt_variants_si = [
-        "What is the return of {name} since launch?",
-        "How much has {name} returned since inception?",
-        "What is the return since inception for {name}?",
-        "Total return of {name} from launch date?"
-    ]
+        for _, row in latest_df.iterrows():
+            name = row['etf_name']
+            value = row['etf_returnsvalue']
+            r_date = row['return_date'].strftime('%b %Y') if pd.notnull(row['return_date']) else "N/A"
+            for template in prompt_variants[period]:
+                prompt = template.format(name=name)
+                response = f"The {period} return of {name} as of {r_date} was {value:.2f}%."
+                result.append({"prompt": prompt, "response": response})
 
-    pairs = []
+    print(f"[INFO] Generated {len(result)} prompt-response pairs")
+    return result
 
-    for _, row in df_1y.iterrows():
-        name, value = row['etf_name'], row['etf_returnsvalue']
-        for template in prompt_variants_1y[:2]:
-            prompt = template.format(name=name)
-            response = f"The 1-year return of {name} as of {ref_month} {ref_year_1y} was {value:.2f}%."
-            pairs.append({"prompt": prompt, "response": response})
-
-    for _, row in df_3y.iterrows():
-        name, value = row['etf_name'], row['etf_returnsvalue']
-        for template in prompt_variants_3y[:2]:
-            prompt = template.format(name=name)
-            response = f"The 3-year return of {name} as of {ref_month} {ref_year_3y} was {value:.2f}%."
-            pairs.append({"prompt": prompt, "response": response})
-
-    for _, row in df_si.iterrows():
-        name, value = row['etf_name'], row['etf_returnsvalue']
-        for template in prompt_variants_si[:2]:
-            prompt = template.format(name=name)
-            response = f"The return of {name} since inception is {value:.2f}%."
-            pairs.append({"prompt": prompt, "response": response})
-
-    print(f"[INFO] Generated {len(pairs)} prompt-response pairs")
-    return pairs
 
 # === Main Training Function ===
 def main():
