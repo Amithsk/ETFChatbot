@@ -49,9 +49,23 @@ class ETFChatbot:
         self.system_prompt = self.config.get("system_prompt", "You are a helpful assistant.")
 
     def ask(self, message):
-        prompt = f"<s>[Prompt] {message} [/Prompt] [Answer]"
+        prompt = f"[Prompt] {message} [/Prompt] [Answer]"
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+
+        # Set stopping token
+        stop_token_id = self.tokenizer.convert_tokens_to_ids("[/Answer]")
+        pad_token_id = self.tokenizer.pad_token_id
+
         with torch.no_grad():
-            outputs = self.model.generate(**inputs, **self.generation_kwargs)
+            outputs = self.model.generate(
+                **inputs,
+                **self.generation_kwargs,
+                eos_token_id=stop_token_id,
+                pad_token_id=pad_token_id,
+            )
+
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return response.split("[Answer]")[-1].strip().replace("</s>", "")
+        # Extract just the part between [Answer] and [/Answer]
+        response_clean = response.split("[Answer]")[-1].split("[/Answer]")[0].strip()
+        return response_clean
+
