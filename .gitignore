@@ -21,9 +21,6 @@ Data/
 Code/setupCheck.py
 
 
-#Ignore the Training folder
-Code/Training
-
 #Ignore the .env file
 .env
 
