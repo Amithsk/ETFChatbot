@@ -63,6 +63,7 @@ def train_metric_adapter(metric_name, prompt_response_pairs, base_model_id):
         save_steps=200,
         save_total_limit=2,
         logging_steps=5,
+        #max_steps=100, #To limit the number of the steps
         eval_strategy="steps",
         eval_steps=20,
         logging_dir=logging_dir,
