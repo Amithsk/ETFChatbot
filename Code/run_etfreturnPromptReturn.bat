@@ -1,6 +1,6 @@
 @echo off
 set VENV_PATH=E:\ETFChatbot\etfchatbotenv
-set SCRIPT_PATH=E:\ETFChatbot\Code\Prompt\etfreturnPromptReturn.py
+set SCRIPT_PATH=E:\ETFChatbot\Code\Training\train_lora_adapters.py
 set LOG_PATH=E:\ETFChatbot\logs\etfreturnPromptReturn.log
 
 REM Ensure logs folder exists
