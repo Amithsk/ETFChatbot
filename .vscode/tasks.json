@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run ETF Prompt Script (Background)",
+      "type": "shell",
+      "command": "run_etfreturnPromptReturn.bat",
+      "windows": {
+        "command": "${workspaceFolder}\\Code\\run_etfreturnPromptReturn.bat"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
+
