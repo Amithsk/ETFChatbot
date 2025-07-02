@@ -33,7 +33,8 @@ def fetch_etf_returns():
 def fetch_etf_expense_ratios():
     engine = create_engine()
     query = """
-        SELECT e.*, r.*
+        SELECT e.etf_id,e.etf_asset_category,e.etf_name,
+          r.etf_expenseratio_value,r.etf_expenseratiomonth,r.etf_expenseratioyear
         FROM etf e
         JOIN etf_expenseratio r ON e.etf_id = r.etf_id
     """
