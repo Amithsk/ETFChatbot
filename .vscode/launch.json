@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Train LoRA Adapter",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/Code/Training/train_lora_adapters.py",
+      "cwd": "${workspaceFolder}/Code",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/Code"
+      }
+    }
+  ]
+}
