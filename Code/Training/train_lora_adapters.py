@@ -9,6 +9,7 @@ It relies on `train_model_utils.py` for the actual LoRA chunk fine-tuning.
 import os
 import datetime
 import shutil
+from zoneinfo import ZoneInfo
 
 # Local imports
 from utils.train_model_utils import fine_tune_chunk
@@ -24,6 +25,8 @@ MODEL_ROOT = os.path.join("Models", "Training", "ModelTraining", RUN_TS)
 FINAL_ROOT = os.path.join("Models", "Training", f"Mistral-LoRA-{RUN_TS}")
 LOG_ROOT = "logs"
 CHUNK_SIZE = 5000  # examples per chunk
+STOP_HOUR = 21  # 9 PM IST
+TIMEZONE = ZoneInfo("Asia/Kolkata")
 
 # Ensure base directories
 os.makedirs(MODEL_ROOT, exist_ok=True)
@@ -49,19 +52,31 @@ def run_pipeline(metric_name, prompt_response_pairs):
     """
     Orchestrates chunked fine-tuning and final model consolidation:
     1. Split `prompt_response_pairs` into chunks of size CHUNK_SIZE.
-    2. Call `fine_tune_chunk(metric_name, chunk, idx)` for each.
-    3. Copy the last chunk's adapter to FINAL_ROOT/metric_name.
+    2. Call `fine_tune_chunk(metric_name, chunk, idx)` for each until 9PM IST.
+    3. Copy the last chunk's adapter to FINAL_ROOT/metric_name if all done.
+    
+    If stopped early, prints total and pending chunks.
     """
     # Split into chunk lists
     chunks = [
         prompt_response_pairs[i : i + CHUNK_SIZE]
         for i in range(0, len(prompt_response_pairs), CHUNK_SIZE)
     ]
+    total = len(chunks)
+
     for idx, chunk in enumerate(chunks):
+        # Check time against 9 PM IST
+        now_ist = datetime.datetime.now(TIMEZONE)
+        if now_ist.hour >= STOP_HOUR:
+            pending = total - idx
+            print(f"[INFO] Reached {STOP_HOUR}:00 IST. Processed {idx}/{total} chunks. {pending} chunks pending.")
+            return  # exit early
+
+        # Fine-tune this chunk
         fine_tune_chunk(metric_name, chunk, idx)
 
-    # Copy final adapter to stable folder
-    last_adapter = os.path.join(MODEL_ROOT, f"{metric_name}_chunk_{len(chunks)-1:02d}")
+    # If all chunks processed, consolidate final adapter
+    last_adapter = os.path.join(MODEL_ROOT, f"{metric_name}_chunk_{total-1:02d}")
     dest = os.path.join(FINAL_ROOT, metric_name)
     shutil.copytree(last_adapter, dest, dirs_exist_ok=True)
     print(f"[INFO] Completed '{metric_name}'. Final model at: {dest}")
