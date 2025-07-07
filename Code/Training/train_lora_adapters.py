@@ -19,11 +19,12 @@ from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_return
 
 # Configuration constants
 RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-# Temporary adapters live under Models/Training/ModelTraining/<timestamp>
-MODEL_ROOT = os.path.join("Models", "Training", "ModelTraining", RUN_TS)
+# Ensure MODEL_ROOT is under the project root: ../../Models/Training/ModelTraining
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
 # Final consolidated adapters go under Models/Training/Mistral-LoRA-<timestamp>
-FINAL_ROOT = os.path.join("Models", "Training", f"Mistral-LoRA-{RUN_TS}")
-LOG_ROOT = "logs"
+FINAL_ROOT = os.path.join(BASE_DIR, "Models", "Training", f"Mistral-LoRA-{RUN_TS}")
+LOG_ROOT = os.path.join(BASE_DIR, "logs")
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
 TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -57,12 +58,15 @@ def run_pipeline(metric_name, prompt_response_pairs):
     
     If stopped early, prints total and pending chunks.
     """
+    print("The total response pairs created",prompt_response_pairs)
     # Split into chunk lists
     chunks = [
         prompt_response_pairs[i : i + CHUNK_SIZE]
         for i in range(0, len(prompt_response_pairs), CHUNK_SIZE)
     ]
     total = len(chunks)
+    print("The total chunks created",total)
+    
 
     for idx, chunk in enumerate(chunks):
         # Check time against 9 PM IST
