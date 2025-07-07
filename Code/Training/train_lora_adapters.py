@@ -58,7 +58,7 @@ def run_pipeline(metric_name, prompt_response_pairs):
     
     If stopped early, prints total and pending chunks.
     """
-    print("The total response pairs created",prompt_response_pairs)
+    print("The total response pairs created",len(prompt_response_pairs))
     # Split into chunk lists
     chunks = [
         prompt_response_pairs[i : i + CHUNK_SIZE]
