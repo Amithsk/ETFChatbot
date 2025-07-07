@@ -18,7 +18,9 @@ from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_return
 
 # Configuration constants
 RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-MODEL_ROOT = os.path.join("ModelTraining", RUN_TS)
+# Temporary adapters live under Models/Training/ModelTraining/<timestamp>
+MODEL_ROOT = os.path.join("Models", "Training", "ModelTraining", RUN_TS)
+# Final consolidated adapters go under Models/Training/Mistral-LoRA-<timestamp>
 FINAL_ROOT = os.path.join("Models", "Training", f"Mistral-LoRA-{RUN_TS}")
 LOG_ROOT = "logs"
 CHUNK_SIZE = 5000  # examples per chunk
