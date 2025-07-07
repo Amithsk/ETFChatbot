@@ -15,15 +15,20 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
+
 # Configuration constants (shared with orchestration file)
 BASE_MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.2"
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-MODEL_ROOT = os.path.join("ModelTraining", RUN_TS)
+BASE_DIR = os.getcwd()  # ✅ FIXED: No os.pardir
+# Paths relative to project root
+MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
 LOG_ROOT = "logs"
+
 OS_MAKE_DIRS = [MODEL_ROOT, LOG_ROOT]
 for _dir in OS_MAKE_DIRS:
     os.makedirs(_dir, exist_ok=True)
+
 
 
 def list_checkpoints(output_dir):

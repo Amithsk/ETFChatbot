@@ -17,14 +17,16 @@ from Prompt.etfexpenseratioPromptReturn import generate_expense_ratio_pairs
 from Prompt.etfreturnPromptReturn import generate_prompt_response_return_pairs
 from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns
 
+
+
+
 # Configuration constants
 RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-# Ensure MODEL_ROOT is under the project root: ../../Models/Training/ModelTraining
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+BASE_DIR = os.getcwd()  # ✅ FIXED: No os.pardir
 MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
-# Final consolidated adapters go under Models/Training/Mistral-LoRA-<timestamp>
 FINAL_ROOT = os.path.join(BASE_DIR, "Models", "Training", f"Mistral-LoRA-{RUN_TS}")
-LOG_ROOT = os.path.join(BASE_DIR, "logs")
+LOG_ROOT = "logs"
+
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
 TIMEZONE = ZoneInfo("Asia/Kolkata")
