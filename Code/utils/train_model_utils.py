@@ -14,40 +14,16 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from utils.train_modelCheckpoint_utils import configuration_constants,get_latest_resume_checkpoint_any_metric
 
 
 # Configuration constants (shared with orchestration file)
 BASE_MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.2"
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-BASE_DIR = os.getcwd()  # ✅ FIXED: No os.pardir
-# Paths relative to project root
-MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
-LOG_ROOT = "logs"
+RUN_TS, MODEL_ROOT,LOG_ROOT = configuration_constants()
 
-OS_MAKE_DIRS = [MODEL_ROOT, LOG_ROOT]
-for _dir in OS_MAKE_DIRS:
-    os.makedirs(_dir, exist_ok=True)
+def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,resume_from_checkpoint: str = None):
 
-
-
-def list_checkpoints(output_dir):
-    """Return sorted checkpoint directories in `output_dir`."""
-    if not os.path.isdir(output_dir):
-        return []
-    ckpts = [d for d in os.listdir(output_dir) if d.startswith("checkpoint-")]
-    return sorted(ckpts, key=lambda x: int(x.split("-")[1]))
-
-
-def get_resume_checkpoint(output_dir):
-    """Return path to latest checkpoint, or None if none."""
-    ckpts = list_checkpoints(output_dir)
-    if not ckpts:
-        return None
-    return os.path.join(output_dir, ckpts[-1])
-
-
-def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: int):
     """
     Fine-tune a LoRA adapter on a chunk of data.
     Resumes from last checkpoint if available.
@@ -115,11 +91,11 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )
 
+
     # Resume from checkpoint if available
-    resume_ckpt = get_resume_checkpoint(adapter_dir)
-    if resume_ckpt:
-        print(f"[INFO] Resuming {metric_name} chunk {chunk_idx} from {resume_ckpt}")
-        trainer.train(resume_from_checkpoint=resume_ckpt)
+    if resume_from_checkpoint:
+        print(f"[INFO] Resuming {metric_name} chunk {chunk_idx} from {resume_from_checkpoint}")
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     else:
         print(f"[INFO] Training new {metric_name} chunk {chunk_idx}")
         trainer.train()
