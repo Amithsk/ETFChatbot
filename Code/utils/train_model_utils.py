@@ -14,7 +14,7 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from utils.train_modelCheckpoint_utils import configuration_constants,get_latest_resume_checkpoint_any_metric
+from utils.train_modelCheckpoint_utils import configuration_constants,get_global_resume_state
 
 
 # Configuration constants (shared with orchestration file)
