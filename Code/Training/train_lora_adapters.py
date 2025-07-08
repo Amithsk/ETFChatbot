@@ -16,85 +16,61 @@ from utils.train_model_utils import fine_tune_chunk
 from Prompt.etfexpenseratioPromptReturn import generate_expense_ratio_pairs
 from Prompt.etfreturnPromptReturn import generate_prompt_response_return_pairs
 from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns
-
-
+from utils.train_modelCheckpoint_utils import configuration_constants,get_global_resume_state
 
 
 # Configuration constants
-RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-BASE_DIR = os.getcwd()  # ✅ FIXED: No os.pardir
-MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
-FINAL_ROOT = os.path.join(BASE_DIR, "Models", "Training", f"Mistral-LoRA-{RUN_TS}")
-LOG_ROOT = "logs"
-
+RUN_TS, MODEL_TRAINING_ROOT, MODEL_ROOT, FINAL_ROOT, LOG_ROOT = configuration_constants()
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
 TIMEZONE = ZoneInfo("Asia/Kolkata")
 
-# Ensure base directories
-os.makedirs(MODEL_ROOT, exist_ok=True)
-os.makedirs(FINAL_ROOT, exist_ok=True)
-os.makedirs(LOG_ROOT, exist_ok=True)
 
+# Detect if we have a prior in-progress run
+(run_ts, resume_metric, resume_chunk, resume_ckpt_path) = get_global_resume_state(MODEL_TRAINING_ROOT)
+if resume_ckpt_path:
+    print(f"[AUTO-RESUME] last run {run_ts}, metric '{resume_metric}', chunk {resume_chunk}, ckpt at {resume_ckpt_path}")
+else:
+    print("[AUTO-RESUME] no previous checkpoints found.")
 
-def list_checkpoints(output_dir):
-    """Return sorted list of checkpoint dirs inside output_dir."""
-    if not os.path.isdir(output_dir):
-        return []
-    ckpts = [d for d in os.listdir(output_dir) if d.startswith("checkpoint-")]
-    return sorted(ckpts, key=lambda x: int(x.split("-")[1]))
-
-
-def get_resume_checkpoint(output_dir):
-    """Get latest checkpoint path, or None if none exist."""
-    ckpts = list_checkpoints(output_dir)
-    return os.path.join(output_dir, ckpts[-1]) if ckpts else None
-
-
-def run_pipeline(metric_name, prompt_response_pairs):
-    """
-    Orchestrates chunked fine-tuning and final model consolidation:
-    1. Split `prompt_response_pairs` into chunks of size CHUNK_SIZE.
-    2. Call `fine_tune_chunk(metric_name, chunk, idx)` for each until 9PM IST.
-    3. Copy the last chunk's adapter to FINAL_ROOT/metric_name if all done.
-    
-    If stopped early, prints total and pending chunks.
-    """
-    print("The total response pairs created",len(prompt_response_pairs))
-    # Split into chunk lists
-    chunks = [
-        prompt_response_pairs[i : i + CHUNK_SIZE]
-        for i in range(0, len(prompt_response_pairs), CHUNK_SIZE)
-    ]
+def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
+    chunks = [pairs[i:i+CHUNK_SIZE] for i in range(0, len(pairs), CHUNK_SIZE)]
     total = len(chunks)
-    print("The total chunks created",total)
-    
 
     for idx, chunk in enumerate(chunks):
-        # Check time against 9 PM IST
+        if idx < start_chunk:
+            print(f"[SKIP] chunk {idx} for '{metric_name}'")
+            continue
+
         now_ist = datetime.datetime.now(TIMEZONE)
         if now_ist.hour >= STOP_HOUR:
-            pending = total - idx
-            print(f"[INFO] Reached {STOP_HOUR}:00 IST. Processed {idx}/{total} chunks. {pending} chunks pending.")
-            return  # exit early
+            print(f"[STOP] reached {STOP_HOUR}:00 IST; stopping at chunk {idx}")
+            return
 
-        # Fine-tune this chunk
-        fine_tune_chunk(metric_name, chunk, idx)
+        # Pass resume_ckpt only on the very first chunk we resume
+        ckpt_to_use = resume_ckpt if (metric_name == resume_metric and idx == start_chunk) else None
+        fine_tune_chunk(metric_name, chunk, idx, ckpt_to_use)
 
-    # If all chunks processed, consolidate final adapter
+    # Consolidate final adapter
     last_adapter = os.path.join(MODEL_ROOT, f"{metric_name}_chunk_{total-1:02d}")
     dest = os.path.join(FINAL_ROOT, metric_name)
     shutil.copytree(last_adapter, dest, dirs_exist_ok=True)
-    print(f"[INFO] Completed '{metric_name}'. Final model at: {dest}")
+    print(f"[DONE] '{metric_name}' -> {dest}")
 
 
 if __name__ == "__main__":
     # Expense Ratio workflow
     df_expense = fetch_etf_expense_ratios()
     pairs_exp = generate_expense_ratio_pairs(df_expense)
-    run_pipeline("expense_ratio", pairs_exp)
+    start = resume_chunk if resume_metric == "expense_ratio" else 0
+    ckpt  = resume_ckpt_path if resume_metric == "expense_ratio" else None
+    run_pipeline("expense_ratio", pairs_exp, start, ckpt)
+    
 
     # Returns workflow
     df_returns = fetch_etf_returns()
     pairs_ret = generate_prompt_response_return_pairs(df_returns)
-    run_pipeline("return_ratio", pairs_ret)
+    start = resume_chunk if resume_metric == "return_ratio" else 0
+    ckpt  = resume_ckpt_path if resume_metric == "return_ratio" else None
+    run_pipeline("return_ratio", pairs_ret, start, ckpt)
+
