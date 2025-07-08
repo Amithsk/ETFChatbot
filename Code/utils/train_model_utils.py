@@ -20,7 +20,8 @@ from utils.train_modelCheckpoint_utils import configuration_constants,get_global
 # Configuration constants (shared with orchestration file)
 BASE_MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.2"
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-RUN_TS, MODEL_ROOT,LOG_ROOT = configuration_constants()
+RUN_TS, MODEL_ROOT,FINAL_ROOT,LOG_ROOT = configuration_constants()
+
 
 def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,resume_from_checkpoint: str = None):
 

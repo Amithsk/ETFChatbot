@@ -20,7 +20,8 @@ from utils.train_modelCheckpoint_utils import configuration_constants,get_global
 
 
 # Configuration constants
-RUN_TS, MODEL_TRAINING_ROOT, MODEL_ROOT, FINAL_ROOT, LOG_ROOT = configuration_constants()
+
+RUN_TS, MODEL_TRAINING_ROOT,FINAL_ROOT, LOG_ROOT = configuration_constants()
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
 TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -52,7 +53,7 @@ def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
         fine_tune_chunk(metric_name, chunk, idx, ckpt_to_use)
 
     # Consolidate final adapter
-    last_adapter = os.path.join(MODEL_ROOT, f"{metric_name}_chunk_{total-1:02d}")
+    last_adapter = os.path.join(MODEL_TRAINING_ROOT, f"{metric_name}_chunk_{total-1:02d}")
     dest = os.path.join(FINAL_ROOT, metric_name)
     shutil.copytree(last_adapter, dest, dirs_exist_ok=True)
     print(f"[DONE] '{metric_name}' -> {dest}")
