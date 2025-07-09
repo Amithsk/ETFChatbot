@@ -6,15 +6,17 @@ def configuration_constants():
     # Configuration constants
     RUN_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     BASE_DIR = os.getcwd()  # ✅ FIXED: No os.pardir
+    GLOBAL_ROOT= os.path.join(BASE_DIR, "Models", "Training", "ModelTraining")
     MODEL_ROOT = os.path.join(BASE_DIR, "Models", "Training", "ModelTraining", RUN_TS)
     FINAL_ROOT = os.path.join(BASE_DIR, "Models", "Training", f"Mistral-LoRA-{RUN_TS}")
     LOG_ROOT = "logs"
 
     # Ensure base directories
+    os.makedirs(GLOBAL_ROOT, exist_ok=True)
     os.makedirs(MODEL_ROOT, exist_ok=True)
     os.makedirs(FINAL_ROOT, exist_ok=True)
     os.makedirs(LOG_ROOT, exist_ok=True)
-    return RUN_TS, MODEL_ROOT, FINAL_ROOT, LOG_ROOT
+    return RUN_TS, GLOBAL_ROOT,MODEL_ROOT, FINAL_ROOT, LOG_ROOT
 
 def list_checkpoints(output_dir):
     """Return sorted list of checkpoint dirs inside output_dir."""
