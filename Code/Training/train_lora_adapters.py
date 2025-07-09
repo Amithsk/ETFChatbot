@@ -7,6 +7,7 @@ This module defines the high-level pipeline orchestration:
 It relies on `train_model_utils.py` for the actual LoRA chunk fine-tuning.
 """
 import os
+import re
 import datetime
 import shutil
 from zoneinfo import ZoneInfo
@@ -21,18 +22,52 @@ from utils.train_modelCheckpoint_utils import configuration_constants,get_global
 
 # Configuration constants
 
-RUN_TS, MODEL_TRAINING_ROOT,FINAL_ROOT, LOG_ROOT = configuration_constants()
+RUN_TS,GLOBAL_ROOT, MODEL_TRAINING_ROOT,FINAL_ROOT, LOG_ROOT = configuration_constants()
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
 TIMEZONE = ZoneInfo("Asia/Kolkata")
 
 
 # Detect if we have a prior in-progress run
-(run_ts, resume_metric, resume_chunk, resume_ckpt_path) = get_global_resume_state(MODEL_TRAINING_ROOT)
+(run_ts, resume_metric, resume_chunk, resume_ckpt_path) = get_global_resume_state(GLOBAL_ROOT)
 if resume_ckpt_path:
     print(f"[AUTO-RESUME] last run {run_ts}, metric '{resume_metric}', chunk {resume_chunk}, ckpt at {resume_ckpt_path}")
 else:
     print("[AUTO-RESUME] no previous checkpoints found.")
+
+#To consolidate all the trained model into one    
+def consolidate_all_chunks(metric_name, resume_root, final_root):
+    chunk_pattern = re.compile(rf"^{re.escape(metric_name)}_chunk_(\d+)$")
+    dest_dir = os.path.join(final_root, metric_name)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    found_chunks = []
+
+    for run_ts in sorted(os.listdir(resume_root)):
+        run_dir = os.path.join(resume_root, run_ts)
+        if not os.path.isdir(run_dir):
+            continue
+
+        for folder in os.listdir(run_dir):
+            match = chunk_pattern.match(folder)
+            if not match:
+                continue
+
+            chunk_idx = int(match.group(1))
+            src_chunk_dir = os.path.join(run_dir, folder)
+            dest_chunk_dir = os.path.join(dest_dir, folder)
+
+            if os.path.exists(dest_chunk_dir):
+                print(f"[SKIP] Chunk {folder} already exists in final folder.")
+                continue
+
+            shutil.copytree(src_chunk_dir, dest_chunk_dir, dirs_exist_ok=True)
+            found_chunks.append(folder)
+
+    if found_chunks:
+        print(f"[DONE] Consolidated chunks for '{metric_name}' into {dest_dir}")
+    else:
+        print(f"[WARN] No chunks found for '{metric_name}' in {resume_root}")
 
 def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
     chunks = [pairs[i:i+CHUNK_SIZE] for i in range(0, len(pairs), CHUNK_SIZE)]
@@ -52,11 +87,7 @@ def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
         ckpt_to_use = resume_ckpt if (metric_name == resume_metric and idx == start_chunk) else None
         fine_tune_chunk(metric_name, chunk, idx, ckpt_to_use)
 
-    # Consolidate final adapter
-    last_adapter = os.path.join(MODEL_TRAINING_ROOT, f"{metric_name}_chunk_{total-1:02d}")
-    dest = os.path.join(FINAL_ROOT, metric_name)
-    shutil.copytree(last_adapter, dest, dirs_exist_ok=True)
-    print(f"[DONE] '{metric_name}' -> {dest}")
+
 
 
 if __name__ == "__main__":
@@ -74,4 +105,8 @@ if __name__ == "__main__":
     start = resume_chunk if resume_metric == "return_ratio" else 0
     ckpt  = resume_ckpt_path if resume_metric == "return_ratio" else None
     run_pipeline("return_ratio", pairs_ret, start, ckpt)
+
+    # Consolidate final adapter
+    for metric_name in ['expense_ratio','return_ratio']:
+        consolidate_all_chunks(metric_name,GLOBAL_ROOT, FINAL_ROOT)
 
