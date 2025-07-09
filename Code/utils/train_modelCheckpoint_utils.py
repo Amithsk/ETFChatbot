@@ -14,7 +14,6 @@ def configuration_constants():
     # Ensure base directories
     os.makedirs(GLOBAL_ROOT, exist_ok=True)
     os.makedirs(MODEL_ROOT, exist_ok=True)
-    os.makedirs(FINAL_ROOT, exist_ok=True)
     os.makedirs(LOG_ROOT, exist_ok=True)
     return RUN_TS, GLOBAL_ROOT,MODEL_ROOT, FINAL_ROOT, LOG_ROOT
 
