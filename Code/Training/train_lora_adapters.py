@@ -11,6 +11,7 @@ import re
 import datetime
 import shutil
 from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 
 # Local imports
 from utils.train_model_utils import fine_tune_chunk
@@ -25,7 +26,9 @@ from utils.train_modelCheckpoint_utils import configuration_constants,get_global
 RUN_TS,GLOBAL_ROOT, MODEL_TRAINING_ROOT,FINAL_ROOT, LOG_ROOT = configuration_constants()
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
-TIMEZONE = ZoneInfo("Asia/Kolkata")
+# Create a timezone-aware IST datetime
+IST_OFFSET = timedelta(hours=5, minutes=30)
+now_ist = datetime.now(timezone.utc) + IST_OFFSET
 
 
 # Detect if we have a prior in-progress run
@@ -78,7 +81,7 @@ def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
             print(f"[SKIP] chunk {idx} for '{metric_name}'")
             continue
 
-        now_ist = datetime.datetime.now(TIMEZONE)
+    
         if now_ist.hour >= STOP_HOUR:
             print(f"[STOP] reached {STOP_HOUR}:00 IST; stopping at chunk {idx}")
             return
