@@ -81,7 +81,7 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
         save_total_limit=3,
         logging_steps=20,
         logging_dir=logging_dir,
-        max_steps=100,
+        max_steps=50,
         fp16=True,
         report_to="none",
     )
@@ -131,12 +131,12 @@ def merge_lora_with_base(base_model_id, lora_path, save_path,cleanup_offload=Tru
 
         # Load LoRA
         model = PeftModel.from_pretrained(
-            model_id=base_model_id,
-            model_id_or_path=lora_path,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            offload_folder=offload_dir,
-            offload_state_dict=True,
+        base_model,
+        model_id=lora_path,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        offload_folder=offload_dir,
+        offload_state_dict=True,
         )
         model = model.merge_and_unload()
 
