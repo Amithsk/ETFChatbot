@@ -3,6 +3,7 @@ import os
 import datetime
 import shutil
 from datasets import Dataset
+from peft import PeftModel, PeftConfig
 
 # HuggingFace + PEFT Imports
 import torch
