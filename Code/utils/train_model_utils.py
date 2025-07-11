@@ -130,7 +130,14 @@ def merge_lora_with_base(base_model_id, lora_path, save_path,cleanup_offload=Tru
      )
 
         # Load LoRA
-        model = PeftModel.from_pretrained(base_model, lora_path)
+        model = PeftModel.from_pretrained(
+            model_id=base_model_id,
+            model_id_or_path=lora_path,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            offload_folder=offload_dir,
+            offload_state_dict=True,
+        )
         model = model.merge_and_unload()
 
         # Save full merged model
@@ -144,3 +151,4 @@ def merge_lora_with_base(base_model_id, lora_path, save_path,cleanup_offload=Tru
         if cleanup_offload and os.path.exists(offload_dir):
             shutil.rmtree(offload_dir)
             print(f"[CLEANUP] Deleted offload cache at {offload_dir}")
+
