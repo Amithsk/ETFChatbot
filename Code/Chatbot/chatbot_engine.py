@@ -35,9 +35,6 @@ class ETFChatbot:
         self.model = AutoModelForCausalLM.from_pretrained(base_model_path,device_map="auto",torch_dtype=torch.float16)
         self.model.eval()
 
-        if torch.cuda.is_available():
-            self.model = self.model.to("cuda")
-
         self.generation_kwargs = {
             "max_new_tokens": self.config.get("n_ctx", 512),
             "temperature": self.config.get("temperature", 0.7),
