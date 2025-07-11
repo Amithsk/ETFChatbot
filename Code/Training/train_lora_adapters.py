@@ -35,9 +35,11 @@ else:
     print("[AUTO-RESUME] no previous checkpoints found.")
 
 def consolidate_all_chunks(metric_name, resume_root, final_root):
+    import re, os, shutil
+
     chunk_pattern = re.compile(rf"^{re.escape(metric_name)}_chunk_(\d+)$")
-    dest_dir = os.path.join(final_root, metric_name)
-    os.makedirs(dest_dir, exist_ok=True)
+    chunk_dest_dir = os.path.join(final_root, metric_name)
+    os.makedirs(chunk_dest_dir, exist_ok=True)
 
     found_chunks = []
     model_files_copied = False
@@ -52,9 +54,8 @@ def consolidate_all_chunks(metric_name, resume_root, final_root):
             if not match:
                 continue
 
-            chunk_idx = int(match.group(1))
             src_chunk_dir = os.path.join(run_dir, folder)
-            dest_chunk_dir = os.path.join(dest_dir, folder)
+            dest_chunk_dir = os.path.join(chunk_dest_dir, folder)
 
             if os.path.exists(dest_chunk_dir):
                 print(f"[SKIP] Chunk {folder} already exists in final folder.")
@@ -62,26 +63,28 @@ def consolidate_all_chunks(metric_name, resume_root, final_root):
                 shutil.copytree(src_chunk_dir, dest_chunk_dir, dirs_exist_ok=True)
                 found_chunks.append(folder)
 
-            if not model_files_copied:
-                model_files = ["config.json", "adapter_model.bin", "pytorch_model.bin",
-                               "tokenizer_config.json", "special_tokens_map.json", "tokenizer.model",
-                               "vocab.json", "merges.txt"]
-                copied_any = False
-                for f in model_files:
-                    src_file = os.path.join(src_chunk_dir, f)
-                    if os.path.exists(src_file):
-                        shutil.copy2(src_file, final_root)
-                        copied_any = True
+        # Copy model files from metric folder (expense_ratio/) to root (only once)
+        metric_dir_in_run = os.path.join(run_dir, metric_name)
+        if os.path.exists(metric_dir_in_run) and not model_files_copied:
+            model_files = [
+                "config.json", "generation_config.json", "model.safetensors.index.json",
+                "model-00001-of-00003.safetensors", "model-00002-of-00003.safetensors", "model-00003-of-00003.safetensors",
+                "special_tokens_map.json", "tokenizer_config.json", "tokenizer.model",
+                "tokenizer.json", "chat_template.jinja"
+            ]
 
-                if copied_any:
-                    model_files_copied = True
-                    print(f"[INFO] Copied model files from chunk '{folder}' to final root: {final_root}")
+            for f in model_files:
+                src_file = os.path.join(metric_dir_in_run, f)
+                if os.path.exists(src_file):
+                    shutil.copy2(src_file, final_root)
+
+            model_files_copied = True
+            print(f"[INFO] Copied model/tokenizer files from {metric_dir_in_run} to {final_root}")
 
     if found_chunks:
-        print(f"[DONE] Consolidated chunks for '{metric_name}' into {dest_dir}")
+        print(f"[DONE] Consolidated chunks for '{metric_name}' into {chunk_dest_dir}")
     else:
         print(f"[WARN] No chunks found for '{metric_name}' in {resume_root}")
-
 def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
     chunks = [pairs[i:i+CHUNK_SIZE] for i in range(0, len(pairs), CHUNK_SIZE)]
     total = len(chunks)
