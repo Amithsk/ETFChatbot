@@ -32,7 +32,7 @@ class ETFChatbot:
         )
 
         print("[INFO] Applying LoRA adapters...")
-        self.model = PeftModel.from_pretrained(base_model, lora_model_path, torch_dtype=torch.float16)
+        self.model = AutoModelForCausalLM.from_pretrained(base_model_path,device_map="auto",torch_dtype=torch.float16)
         self.model.eval()
 
         if torch.cuda.is_available():
