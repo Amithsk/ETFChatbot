@@ -107,3 +107,28 @@ def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,
     print(f"[INFO] Saved chunk {chunk_idx} at {adapter_dir}")
 
     return adapter_dir
+
+def merge_lora_with_base(base_model_id, lora_path, save_path):
+    """
+    Merges the LoRA adapter with the base model and saves the merged full model.
+    """
+    print(f"[INFO] Merging LoRA at {lora_path} with base model {base_model_id}...")
+
+    # Load base model
+    base_model = AutoModelForCausalLM.from_pretrained(
+        base_model_id,
+        torch_dtype=torch.float16,
+        device_map="auto",
+        load_in_4bit=False,
+    )
+
+    # Load LoRA
+    model = PeftModel.from_pretrained(base_model, lora_path)
+    model = model.merge_and_unload()
+
+    # Save full merged model
+    model.save_pretrained(save_path)
+    tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+    tokenizer.save_pretrained(save_path)
+
+    print(f"[DONE] Merged model saved at {save_path}")
