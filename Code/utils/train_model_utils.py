@@ -77,7 +77,7 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
         per_device_train_batch_size=1,
         num_train_epochs=2,
         save_strategy="steps",
-        save_steps=200,
+        save_steps=10,
         save_total_limit=3,
         logging_steps=20,
         logging_dir=logging_dir,
