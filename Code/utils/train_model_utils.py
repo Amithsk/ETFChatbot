@@ -142,6 +142,7 @@ def merge_lora_with_base(base_model_id, lora_path, save_path,cleanup_offload=Tru
 
         # Save full merged model
         model.save_pretrained(save_path)
+        model.config.to_json_file(os.path.join(save_path, "config.json"))
         tokenizer = AutoTokenizer.from_pretrained(base_model_id)
         tokenizer.save_pretrained(save_path)
 
