@@ -3,6 +3,7 @@ import os
 import datetime
 import shutil
 from datasets import Dataset
+import tempfile
 from peft import PeftModel, PeftConfig
 
 # HuggingFace + PEFT Imports
@@ -80,6 +81,7 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
         save_total_limit=3,
         logging_steps=20,
         logging_dir=logging_dir,
+        max_steps=100,
         fp16=True,
         report_to="none",
     )
@@ -107,27 +109,38 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
 
     return adapter_dir
 
-def merge_lora_with_base(base_model_id, lora_path, save_path):
+def merge_lora_with_base(base_model_id, lora_path, save_path,cleanup_offload=True):
     """
     Merges the LoRA adapter with the base model and saves the merged full model.
     """
     print(f"[INFO] Merging LoRA at {lora_path} with base model {base_model_id}...")
+    
+   # Use a temporary folder for offloading
+    offload_dir = tempfile.mkdtemp(prefix="offload_")
 
-    # Load base model
-    base_model = AutoModelForCausalLM.from_pretrained(
+    try:
+        # Load base model
+        base_model = AutoModelForCausalLM.from_pretrained(
         base_model_id,
         torch_dtype=torch.float16,
         device_map="auto",
         load_in_4bit=False,
-    )
+        offload_folder=offload_dir,
+        offload_state_dict=True  # Important for large model compatibility
+     )
 
-    # Load LoRA
-    model = PeftModel.from_pretrained(base_model, lora_path)
-    model = model.merge_and_unload()
+        # Load LoRA
+        model = PeftModel.from_pretrained(base_model, lora_path)
+        model = model.merge_and_unload()
 
-    # Save full merged model
-    model.save_pretrained(save_path)
-    tokenizer = AutoTokenizer.from_pretrained(base_model_id)
-    tokenizer.save_pretrained(save_path)
+        # Save full merged model
+        model.save_pretrained(save_path)
+        tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+        tokenizer.save_pretrained(save_path)
 
-    print(f"[DONE] Merged model saved at {save_path}")
+        print(f"[DONE] Merged model saved at {save_path}")
+    finally:
+        # Clean up offload folder if requested
+        if cleanup_offload and os.path.exists(offload_dir):
+            shutil.rmtree(offload_dir)
+            print(f"[CLEANUP] Deleted offload cache at {offload_dir}")
