@@ -35,7 +35,7 @@ else:
     print("[AUTO-RESUME] no previous checkpoints found.")
 
 def consolidate_all_chunks(metric_name, resume_root, final_root):
-    import re, os, shutil
+    
 
     chunk_pattern = re.compile(rf"^{re.escape(metric_name)}_chunk_(\d+)$")
     chunk_dest_dir = os.path.join(final_root, metric_name)
@@ -107,7 +107,7 @@ def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
 
     # Final merge after all chunks
     print(f"[INFO] Merging final model for '{metric_name}'...")
-    merge_lora_with_base("mistralai/Mistral-7B-Instruct-v0.2", base_model_path, os.path.join(FINAL_ROOT, metric_name))
+    merge_lora_with_base("mistralai/Mistral-7B-Instruct-v0.2", base_model_path, os.path.join(FINAL_ROOT))
 
 if __name__ == "__main__":
     df_expense = fetch_etf_expense_ratios()
