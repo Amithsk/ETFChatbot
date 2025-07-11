@@ -14,24 +14,20 @@ from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
 # Local imports
-#from utils.train_model_utils import fine_tune_chunk
-#from Prompt.etfexpenseratioPromptReturn import generate_expense_ratio_pairs
-#from Prompt.etfreturnPromptReturn import generate_prompt_response_return_pairs
-#from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns
-from utils.train_modelCheckpoint_utils import configuration_constants,get_global_resume_state
-
+from utils.train_model_utils import fine_tune_chunk, merge_lora_with_base
+from Prompt.etfexpenseratioPromptReturn import generate_expense_ratio_pairs
+from Prompt.etfreturnPromptReturn import generate_prompt_response_return_pairs
+from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns
+from utils.train_modelCheckpoint_utils import configuration_constants, get_global_resume_state
 
 # Configuration constants
-
-RUN_TS,GLOBAL_ROOT, MODEL_TRAINING_ROOT,FINAL_ROOT, LOG_ROOT = configuration_constants()
+RUN_TS, GLOBAL_ROOT, MODEL_TRAINING_ROOT, FINAL_ROOT, LOG_ROOT = configuration_constants()
 CHUNK_SIZE = 5000  # examples per chunk
 STOP_HOUR = 21  # 9 PM IST
-# Create a timezone-aware IST datetime
 IST_OFFSET = timedelta(hours=5, minutes=30)
 now_ist = datetime.now(timezone.utc) + IST_OFFSET
 
-
-# Detect if we have a prior in-progress run
+# Detect resume state
 (run_ts, resume_metric, resume_chunk, resume_ckpt_path) = get_global_resume_state(GLOBAL_ROOT)
 if resume_ckpt_path:
     print(f"[AUTO-RESUME] last run {run_ts}, metric '{resume_metric}', chunk {resume_chunk}, ckpt at {resume_ckpt_path}")
@@ -60,19 +56,16 @@ def consolidate_all_chunks(metric_name, resume_root, final_root):
             src_chunk_dir = os.path.join(run_dir, folder)
             dest_chunk_dir = os.path.join(dest_dir, folder)
 
-            # Copy the chunk into final metric directory
             if os.path.exists(dest_chunk_dir):
                 print(f"[SKIP] Chunk {folder} already exists in final folder.")
             else:
                 shutil.copytree(src_chunk_dir, dest_chunk_dir, dirs_exist_ok=True)
                 found_chunks.append(folder)
 
-            # Also copy model files to final_root if not already done
             if not model_files_copied:
                 model_files = ["config.json", "adapter_model.bin", "pytorch_model.bin",
                                "tokenizer_config.json", "special_tokens_map.json", "tokenizer.model",
-                               "vocab.json", "merges.txt"]  # add/adjust for your tokenizer
-
+                               "vocab.json", "merges.txt"]
                 copied_any = False
                 for f in model_files:
                     src_file = os.path.join(src_chunk_dir, f)
@@ -89,45 +82,42 @@ def consolidate_all_chunks(metric_name, resume_root, final_root):
     else:
         print(f"[WARN] No chunks found for '{metric_name}' in {resume_root}")
 
+def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
+    chunks = [pairs[i:i+CHUNK_SIZE] for i in range(0, len(pairs), CHUNK_SIZE)]
+    total = len(chunks)
 
-#def run_pipeline(metric_name, pairs, start_chunk=0, resume_ckpt=None):
-#    chunks = [pairs[i:i+CHUNK_SIZE] for i in range(0, len(pairs), CHUNK_SIZE)]
-#    total = len(chunks)
+    base_model_path = "mistralai/Mistral-7B-Instruct-v0.2"
+    for idx, chunk in enumerate(chunks):
+        if idx < start_chunk:
+            print(f"[SKIP] chunk {idx} for '{metric_name}'")
+            continue
 
-#    for idx, chunk in enumerate(chunks):
-#        if idx < start_chunk:
-#            print(f"[SKIP] chunk {idx} for '{metric_name}'")
-#            continue
+        if now_ist.hour >= STOP_HOUR:
+            print(f"[STOP] reached {STOP_HOUR}:00 IST; stopping at chunk {idx}")
+            return
 
-    
-#        if now_ist.hour >= STOP_HOUR:
-#            print(f"[STOP] reached {STOP_HOUR}:00 IST; stopping at chunk {idx}")
-#            return
+        ckpt_to_use = resume_ckpt if (metric_name == resume_metric and idx == start_chunk) else None
+        adapter_dir = fine_tune_chunk(metric_name, chunk, idx, ckpt_to_use, base_model_path)
 
-        # Pass resume_ckpt only on the very first chunk we resume
-#        ckpt_to_use = resume_ckpt if (metric_name == resume_metric and idx == start_chunk) else None
-#        fine_tune_chunk(metric_name, chunk, idx, ckpt_to_use)
+        # Update base_model_path to the latest adapter
+        base_model_path = adapter_dir
 
-
-
+    # Final merge after all chunks
+    print(f"[INFO] Merging final model for '{metric_name}'...")
+    merge_lora_with_base("mistralai/Mistral-7B-Instruct-v0.2", base_model_path, os.path.join(FINAL_ROOT, metric_name))
 
 if __name__ == "__main__":
-    # Expense Ratio workflow
-    #df_expense = fetch_etf_expense_ratios()
-    #pairs_exp = generate_expense_ratio_pairs(df_expense)
-    #start = resume_chunk if resume_metric == "expense_ratio" else 0
-    #ckpt  = resume_ckpt_path if resume_metric == "expense_ratio" else None
-    #run_pipeline("expense_ratio", pairs_exp, start, ckpt)
-    
+    df_expense = fetch_etf_expense_ratios()
+    pairs_exp = generate_expense_ratio_pairs(df_expense)
+    start = resume_chunk if resume_metric == "expense_ratio" else 0
+    ckpt  = resume_ckpt_path if resume_metric == "expense_ratio" else None
+    run_pipeline("expense_ratio", pairs_exp, start, ckpt)
 
-    # Returns workflow
-    #df_returns = fetch_etf_returns()
-    #pairs_ret = generate_prompt_response_return_pairs(df_returns)
-    #start = resume_chunk if resume_metric == "return_ratio" else 0
-    #ckpt  = resume_ckpt_path if resume_metric == "return_ratio" else None
-    #run_pipeline("return_ratio", pairs_ret, start, ckpt)
+    df_returns = fetch_etf_returns()
+    pairs_ret = generate_prompt_response_return_pairs(df_returns)
+    start = resume_chunk if resume_metric == "return_ratio" else 0
+    ckpt  = resume_ckpt_path if resume_metric == "return_ratio" else None
+    run_pipeline("return_ratio", pairs_ret, start, ckpt)
 
-    # Consolidate final adapter
-    for metric_name in ['expense_ratio','return_ratio']:
-        consolidate_all_chunks(metric_name,GLOBAL_ROOT, FINAL_ROOT)
-
+    for metric_name in ['expense_ratio', 'return_ratio']:
+        consolidate_all_chunks(metric_name, GLOBAL_ROOT, FINAL_ROOT)

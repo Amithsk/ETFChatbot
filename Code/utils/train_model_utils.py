@@ -15,17 +15,14 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from utils.train_modelCheckpoint_utils import configuration_constants,get_global_resume_state
-
+from utils.train_modelCheckpoint_utils import configuration_constants, get_global_resume_state
 
 # Configuration constants (shared with orchestration file)
 BASE_MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.2"
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-RUN_TS,GLOBAL_ROOT, MODEL_ROOT,FINAL_ROOT,LOG_ROOT = configuration_constants()
+RUN_TS, GLOBAL_ROOT, MODEL_ROOT, FINAL_ROOT, LOG_ROOT = configuration_constants()
 
-
-def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,resume_from_checkpoint: str = None):
-
+def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: int, resume_from_checkpoint: str = None, base_model_path=BASE_MODEL_ID):
     """
     Fine-tune a LoRA adapter on a chunk of data.
     Resumes from last checkpoint if available.
@@ -34,15 +31,17 @@ def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,
     adapter_dir = os.path.join(MODEL_ROOT, f"{metric_name}_chunk_{chunk_idx:02d}")
     os.makedirs(adapter_dir, exist_ok=True)
 
-    # Tokenizer & model
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID, use_auth_token=HUGGINGFACE_TOKEN)
+    # Tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(base_model_path, use_auth_token=HUGGINGFACE_TOKEN if "mistralai" in base_model_path else None)
     tokenizer.pad_token = tokenizer.eos_token
+
+    # Load model (can be original base model or previous chunk's output)
     model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL_ID,
+        base_model_path,
         load_in_4bit=True,
         torch_dtype=torch.float16,
         device_map="auto",
-        use_auth_token=HUGGINGFACE_TOKEN,
+        use_auth_token=HUGGINGFACE_TOKEN if "mistralai" in base_model_path else None,
     )
     model = prepare_model_for_kbit_training(model)
 
@@ -92,7 +91,6 @@ def fine_tune_chunk(metric_name: str,prompt_response_pairs: list,chunk_idx: int,
         tokenizer=tokenizer,
         data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )
-
 
     # Resume from checkpoint if available
     if resume_from_checkpoint:
