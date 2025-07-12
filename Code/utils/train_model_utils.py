@@ -81,7 +81,7 @@ def fine_tune_chunk(metric_name: str, prompt_response_pairs: list, chunk_idx: in
         save_total_limit=3,
         logging_steps=20,
         logging_dir=logging_dir,
-        max_steps=50,
+        #max_steps=50,
         fp16=True,
         report_to="none",
     )
