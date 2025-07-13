@@ -17,7 +17,8 @@ from datetime import datetime, timedelta, timezone
 from utils.train_model_utils import fine_tune_chunk, merge_lora_with_base
 from Prompt.etfexpenseratioPromptReturn import generate_expense_ratio_pairs
 from Prompt.etfreturnPromptReturn import generate_prompt_response_return_pairs
-from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns
+from Prompt.etfaumPromptReturn import generate_aum_pairs
+from utils.train_modelDB_utils import fetch_etf_expense_ratios, fetch_etf_returns, fetch_etf_aum
 from utils.train_modelCheckpoint_utils import configuration_constants, get_global_resume_state
 
 # Configuration constants
@@ -122,5 +123,11 @@ if __name__ == "__main__":
     ckpt  = resume_ckpt_path if resume_metric == "return_ratio" else None
     run_pipeline("return_ratio", pairs_ret, start, ckpt)
 
-    for metric_name in ['expense_ratio', 'return_ratio']:
+    df_returns =  fetch_etf_aum()
+    pairs_ret = generate_aum_pairs(df_returns)
+    start = resume_chunk if resume_metric == "aum" else 0
+    ckpt  = resume_ckpt_path if resume_metric == "aum" else None
+    run_pipeline("aum", pairs_ret, start, ckpt)
+
+    for metric_name in ['expense_ratio', 'return_ratio','aum']:
         consolidate_all_chunks(metric_name, GLOBAL_ROOT, FINAL_ROOT)
