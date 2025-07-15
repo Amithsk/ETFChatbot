@@ -45,7 +45,7 @@ def fetch_etf_aum():
     engine = create_engine()
     query = """
         SELECT e.etf_id,e.etf_asset_category,e.etf_name,
-          a.etf_aum,a.etf_aum_month,a.etf_aum_month
+          a.etf_aum,a.etf_aum_month,a.etf_aum_year
         FROM etf e
         JOIN etf_aum a ON e.etf_id = a.etf_id
     """
