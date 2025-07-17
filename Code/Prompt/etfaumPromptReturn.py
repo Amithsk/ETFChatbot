@@ -1,5 +1,6 @@
 import datetime
 import random
+import pandas as pd
 
 def conversational_variants(template, *args):
     base = template.format(*args)
@@ -14,24 +15,51 @@ def conversational_variants(template, *args):
 
 def generate_aum_pairs(df):
     pairs = []
-    current_year = df['aum_year'].max()
+    current_year = df['etf_aum_year'].max()
 
     # 1. AUM last year
     for _, row in df.iterrows():
         etf = row['etf_name']
-        year = row['aum_year'] - 1
-        value = row['aum_prev_year_value']
+        year = int(row['etf_aum_year']) - 1
+        value = float(row['etf_aum'])
         response = f"The AUM of {etf} in {year} was ₹{value:,.0f} Cr."
         for prompt in conversational_variants("What was the AUM of {} last year?", etf):
             pairs.append({"prompt": prompt, "response": response})
 
-    # 2. AUM increase
-    for _, row in df.iterrows():
-        etf = row['etf_name']
-        increase = row['aum_value'] - row['aum_prev_year_value']
-        response = f"The AUM of {etf} increased by ₹{increase:,.0f} Cr in {row['aum_year']} compared to {row['aum_year']-1}."
-        for prompt in conversational_variants("What was the AUM increase for {}?", etf):
-            pairs.append({"prompt": prompt, "response": response})
+    # 2. AUM increase year-over-year
+    df['etf_aum_year'] = df['etf_aum_year'].astype(int)
+    df['etf_aum'] = df['etf_aum'].astype(float)
+
+    aum_pivot = df.pivot_table(
+    index='etf_name',
+    columns='etf_aum_year',
+    values='etf_aum',
+    aggfunc='mean'  # or 'sum', 'max', etc., depending on your use case
+        )
+
+    for etf in aum_pivot.index:
+        years = sorted(aum_pivot.columns)
+    for i in range(1, len(years)):
+        prev_year = years[i - 1]
+        curr_year = years[i]
+        prev_value = aum_pivot.loc[etf, prev_year]
+        curr_value = aum_pivot.loc[etf, curr_year]
+
+        if pd.notna(prev_value) and pd.notna(curr_value):
+            increase = curr_value - prev_value
+            response = (
+                f"The AUM of {etf} increased by ₹{increase:,.0f} Cr in {curr_year} compared to {prev_year}."
+            )
+            for prompt in conversational_variants("What was the AUM increase for {}?", etf):
+                pairs.append({"prompt": prompt, "response": response})
+
+        if pd.notna(prev_value) and pd.notna(curr_value):
+            increase = curr_value - prev_value
+            response = (
+                f"The AUM of {etf} increased by ₹{increase:,.0f} Cr in {curr_year} compared to {prev_year}."
+            )
+            for prompt in conversational_variants("What was the AUM increase for {}?", etf):
+                pairs.append({"prompt": prompt, "response": response})
 
     # 3. ETF with highest AUM in gold asset class
     gold_df = df[df['asset_class'].str.lower() == 'gold']
@@ -44,3 +72,6 @@ def generate_aum_pairs(df):
             pairs.append({"prompt": prompt.strip(), "response": response})
 
     return pairs
+
+
+ChatGPT said:
