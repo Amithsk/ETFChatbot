@@ -1,7 +1,11 @@
 import gradio as gr
 from chatbot_engine import ETFChatbot
+import os
 
-chatbot = ETFChatbot("Code/Chatbot/config.yaml")
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+config_path = os.path.join(project_root, "Code", "Chatbot", "config.yaml")
+
+chatbot = ETFChatbot(config_path)
 
 def user_input(message, chat_history):
     response = chatbot.ask(message)
