@@ -72,6 +72,3 @@ def generate_aum_pairs(df):
             pairs.append({"prompt": prompt.strip(), "response": response})
 
     return pairs
-
-
-ChatGPT said:
